@@ -1,0 +1,8 @@
+# 文件夾
+data
+.vscode
+
+# pyenv資料
+.python-*
+Pipfile
+Pipfile.lock
