@@ -6,3 +6,9 @@ data
 .python-*
 Pipfile
 Pipfile.lock
+
+# python 原生 venv
+.venv
+
+# window 本身的套件
+window*.txt
