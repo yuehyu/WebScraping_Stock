@@ -44,3 +44,5 @@ def taifex_stock(date: str) -> pd.DataFrame:
     print(data_json)
 
 
+def main(start_date: str, end_date: str) -> pd.DataFrame:
+  pass
