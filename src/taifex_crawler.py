@@ -29,8 +29,6 @@ def taifex_header():
     "upgrade-insecure-requests": "1",
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
   }
-
-
 class TaiwanFuturesDaily(BaseModel):
   date: str
   FuturesID: str
@@ -53,7 +51,7 @@ def gen_date(start_date: str, end_date: str) -> typing.List[str]:
   date_list = [ str(start_date + datetime.timedelta(days = day)) for day in range(days) ]
   return date_list
 
-def column_zh2en(df: pd.DataFrame) -> pd.DataFrame:
+def colname_zh2en(df: pd.DataFrame) -> pd.DataFrame:
   """
   利用字典（Dictionary）將 DataFrame 的所有欄位名稱（Columns）批次進行更名或轉換。
   """
@@ -88,6 +86,33 @@ def column_zh2en(df: pd.DataFrame) -> pd.DataFrame:
   ]
   return df
 
+def clean_data(df: pd.DataFrame) -> pd.DataFrame:
+  df["date"] = df["date"].str.replace("/", "-")
+  df["ChangePer"] = df["ChangePer"].str.replace("%", "")
+  df["ContractDate"] = df["ContractDate"].astype(str).str.replace(" ", "")
+  if "TradingSession" in df.columns:
+    df["TradingSession"] = df["TradingSession"].map(
+      {
+        "一般": "Position",
+        "盤後": "AfterMarket"
+      }
+    )
+  else:
+    df["TradingSession"] ="Position"
+  for col in [
+    "Open",
+    "Max",
+    "Min",
+    "Close",
+    "Change",
+    "ChangePer",
+    "Volume",
+    "SettlementPrice",
+    "OpenInterest",
+  ]:
+    df[col] = (df[col].replace("-", "0").astype(float))
+  df = df.fillna(0)
+  return df
 
 
 
@@ -106,10 +131,6 @@ def taifex_stock(date: str) -> pd.DataFrame:
     header = taifex_header(),
     date = payload_data
   )
-
-
-
-
 
 def main(start_date: str, end_date: str) -> pd.DataFrame:
   date = gen_date(start_date, end_date)
