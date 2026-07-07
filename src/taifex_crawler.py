@@ -1,7 +1,14 @@
 """爬蟲
 抓取股票資料
 """
+import datetime
+import sys
+import time
+import typing
 import os
+
+from loguru import logger
+from pydantic import BaseModel
 import requests
 import pandas as pd
 
@@ -24,6 +31,66 @@ def taifex_header():
   }
 
 
+class TaiwanFuturesDaily(BaseModel):
+  date: str
+  FuturesID: str
+  ContractDate: str
+  Open : float
+  Max: float
+  Min: float
+  Close: float
+  Change: float
+  ChangePer: float
+  Volume: float
+  SettlementPrice: float
+  OpenInterest: int
+  TradingSession: int
+
+def gen_date(start_date: str, end_date: str) -> typing.List[str]:
+  start_date = (datetime.datetime.strptime(start_date, "%Y-%m-%d").date())
+  end_date = (datetime.datetime.strptime(end_date, "%Y-%m-%d").date())
+  days = (end_date-start_date).days + 1
+  date_list = [ str(start_date + datetime.timedelta(days = day)) for day in range(days) ]
+  return date_list
+
+def column_zh2en(df: pd.DataFrame) -> pd.DataFrame:
+  """
+  利用字典（Dictionary）將 DataFrame 的所有欄位名稱（Columns）批次進行更名或轉換。
+  """
+  colname_dict = {
+    "交易日期": "date",
+    "契約": "FuturesID",
+    "到期月份(週別)": "ContractDate",
+    "開盤價": "Open",
+    "最高價": "Max",
+    "最低價": "Min",
+    "收盤價": "Close",
+    "漲跌價": "Change",
+    "漲跌%": "ChangePer",
+    "成交量": "Volume",
+    "結算價": "SettlementPrice",
+    "未沖銷契約數": "OpenInterest",
+    "交易時段":"TradingSession"
+  }
+  df = df.drop(
+    [
+      "最後最佳買價",
+      "最後最佳賣價",
+      "歷史最高價",
+      "歷史最低價",
+      "是否因訊息面暫停交易",
+      "價差對單式委託成交量"
+    ],
+    axis=1
+  )
+  df.columns = [
+    colname_dict[col] for col in df.columns
+  ]
+  return df
+
+
+
+
 def taifex_stock(date: str) -> pd.DataFrame:
   url = "https://www.taifex.com.tw/cht/3/futDataDown"
   payload_data = {
@@ -39,10 +106,10 @@ def taifex_stock(date: str) -> pd.DataFrame:
     header = taifex_header(),
     date = payload_data
   )
-  if res.status_code == 200 :
-    data_json = res.json()
-    print(data_json)
+
+
+
 
 
 def main(start_date: str, end_date: str) -> pd.DataFrame:
-  pass
+  date = gen_date(start_date, end_date)
