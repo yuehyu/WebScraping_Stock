@@ -11,4 +11,4 @@ Pipfile.lock
 .venv
 
 # window 本身的套件
-window*.txt
+Window*.txt
