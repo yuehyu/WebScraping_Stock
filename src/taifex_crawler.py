@@ -6,6 +6,8 @@ import sys
 import time
 import typing
 import os
+import io
+
 
 from loguru import logger
 from pydantic import BaseModel
@@ -14,21 +16,22 @@ import pandas as pd
 
 def taifex_header():
   return{
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-    "accept-encoding": "gzip, deflate, br",
-    "accept-language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-    "cache-control": "max-age=0",
-    "content-length": "135",
-    "content-type": "application/x-www-form-urlencoded",
-    "origin": "https://www.taifex.com.tw",
-    "referer": "https://www.taifex.com.tw/cht/3/futDailyMarketView",
-    "sec-fetch-dest": "document",
-    "sec-fetch-mode": "navigate",
-    "sec-fetch-site": "same-origin",
-    "sec-fetch-user": "?1",
-    "upgrade-insecure-requests": "1",
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Cache-Control": "max-age=0",
+    "Content-Length": "135",
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Origin": "https://www.taifex.com.tw",
+    "Referer": "https://www.taifex.com.tw/cht/3/futDailyMarketView",
+    "Sec-fetch-dest": "document",
+    "Sec-fetch-mode": "navigate",
+    "Sec-fetch-site": "same-origin",
+    "Sec-fetch-user": "?1",
+    "Upgrade-Insecure-Requests": "1",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
   }
+
 class TaiwanFuturesDaily(BaseModel):
   date: str
   FuturesID: str
@@ -42,7 +45,7 @@ class TaiwanFuturesDaily(BaseModel):
   Volume: float
   SettlementPrice: float
   OpenInterest: int
-  TradingSession: int
+  TradingSession: str
 
 def gen_date(start_date: str, end_date: str) -> typing.List[str]:
   start_date = (datetime.datetime.strptime(start_date, "%Y-%m-%d").date())
@@ -114,6 +117,11 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
   df = df.fillna(0)
   return df
 
+def check_schema(df: pd.DataFrame) -> pd.DataFrame:
+  df_dict = df.to_dict("records")
+  df_schema = [TaiwanFuturesDaily(**dd).__dict__ for dd in df_dict]
+  df = pd.DataFrame(df_schema)
+  return df
 
 
 def taifex_stock(date: str) -> pd.DataFrame:
@@ -121,16 +129,44 @@ def taifex_stock(date: str) -> pd.DataFrame:
   payload_data = {
     "down_type": "1",
     "commodity_id": "all",
-    "queryStartDate": date.replace("/", "-"),
-    "queryEndDate": date.replace("/", "-"),
-    "commodity_idt": "all",
+    "queryStartDate": date.replace("-", "/"),
+    "queryEndDate": date.replace("-", "/"),
   }
-  
-  res = requests.post(
+  time.sleep(10)
+  resp = requests.post(
     url,
-    header = taifex_header(),
-    date = payload_data
+    headers = taifex_header(),
+    data = payload_data
   )
+  if resp.ok:
+    if resp.content:
+      df = pd.read_csv(
+        io.StringIO(
+          resp.content.decode(
+            "big5"
+          )
+        ),
+        index_col= False
+      )
+  else:
+    return pd.DataFrame
+  return df
 
 def main(start_date: str, end_date: str) -> pd.DataFrame:
-  date = gen_date(start_date, end_date)
+  date_list= gen_date(start_date, end_date)
+  for date in date_list:
+    logger.info(date)
+    df = taifex_stock(date)
+    if len(df) > 0:
+      df = colname_zh2en(df.copy())
+      df = clean_data(df.copy())
+      df = check_schema(df.copy())
+      use_file = __file__
+      filename = os.path.basename(use_file).split("_")[0]
+      df.to_csv(
+        f"data/{filename}/Taiwan_Stock_Price_{filename}_{date}.csv", index=False
+      )
+
+if __name__ == "__main__":
+  start_date, end_date = sys.argv[1:]
+  main(start_date, end_date)
